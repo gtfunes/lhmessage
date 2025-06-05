@@ -1,0 +1,87 @@
+/**
+ * Sample React Native App
+ * https://github.com/facebook/react-native
+ *
+ * @format
+ */
+
+import React from 'react';
+import { NavigationContainer } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { Login } from './src/components/Login';
+import { Chat } from './src/components/Chat';
+import { RootStackParamList } from './src/types/navigation';
+import { View, Text } from 'react-native';
+
+const Stack = createNativeStackNavigator<RootStackParamList>();
+
+class ErrorBoundary extends React.Component<{ children: React.ReactNode }> {
+  state = { hasError: false, error: null };
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('App Error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <Text>Something went wrong. Please restart the app.</Text>
+          <Text style={{ marginTop: 10, color: 'red' }}>{this.state.error?.toString()}</Text>
+        </View>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
+export default function App() {
+  console.log('App: Starting initialization');
+
+  try {
+    return (
+      <ErrorBoundary>
+        <NavigationContainer
+          onStateChange={(state) => console.log('Navigation state changed:', state)}
+          onReady={() => console.log('Navigation container is ready')}
+        >
+          <Stack.Navigator
+            initialRouteName="Login"
+            screenOptions={{
+              headerShown: false,
+              animation: 'default',
+            }}
+          >
+            <Stack.Screen
+              name="Login"
+              component={Login}
+              listeners={{
+                focus: () => console.log('Login screen focused'),
+              }}
+            />
+            <Stack.Screen
+              name="Chat"
+              component={Chat}
+              listeners={{
+                focus: () => console.log('Chat screen focused'),
+              }}
+            />
+          </Stack.Navigator>
+        </NavigationContainer>
+      </ErrorBoundary>
+    );
+  } catch (error) {
+    console.error('App: Error during initialization:', error);
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <Text>Failed to initialize app. Please restart.</Text>
+        <Text style={{ marginTop: 10, color: 'red' }}>{error?.toString()}</Text>
+      </View>
+    );
+  }
+}
