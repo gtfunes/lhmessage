@@ -14,6 +14,7 @@ export enum ConnectionState {
 export interface MessageEvent {
     peerId: string;
     message: string;
+    type: 'text' | 'image';
 }
 
 export interface ConnectionStateEvent {
@@ -36,6 +37,9 @@ export default {
     },
     sendMessage: (message: string): Promise<void> => {
         return LHMessagePeerConnection.sendMessage(message);
+    },
+    sendImage: (base64Image: string): Promise<void> => {
+        return LHMessagePeerConnection.sendImage(base64Image);
     },
     addPeerFoundListener: (callback: (event: PeerEvent) => void) => {
         return eventEmitter.addListener('peerFound', callback);

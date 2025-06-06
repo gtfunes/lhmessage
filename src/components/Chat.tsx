@@ -1,15 +1,18 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, StyleSheet, Alert, Text } from 'react-native';
-import { GiftedChat, IMessage } from 'react-native-gifted-chat';
+import { View, StyleSheet, Alert, Text, Image } from 'react-native';
+import { GiftedChat, IMessage, Send, Actions, SendProps, ActionsProps, MessageImageProps } from 'react-native-gifted-chat';
 import { ChatScreenProps } from '../types/navigation';
 import LHMessagePeerConnection, { ConnectionState, MessageEvent } from '../native/LHMessagePeerConnection';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { launchImageLibrary } from 'react-native-image-picker';
+import Icon from 'react-native-vector-icons/FontAwesome';
 
 export const Chat = ({ route, navigation }: ChatScreenProps) => {
   const insets = useSafeAreaInsets();
   const { username, deviceId, roomName } = route.params;
   const [messages, setMessages] = useState<IMessage[]>([]);
   const [connectedPeers, setConnectedPeers] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     navigation.setOptions({
@@ -20,6 +23,8 @@ export const Chat = ({ route, navigation }: ChatScreenProps) => {
       gestureEnabled: true,
     });
   }, [navigation, roomName]);
+
+  const cameraButton = useCallback(() => <Icon name="camera" size={20} color="#007AFF" />, []);
 
   const setupPeerConnection = useCallback(() => {
     try {
@@ -35,16 +40,17 @@ export const Chat = ({ route, navigation }: ChatScreenProps) => {
         setConnectedPeers(prev => prev.filter(p => p !== peerId));
       });
 
-      const messageSubscription = LHMessagePeerConnection.addMessageReceivedListener(({ peerId, message }: MessageEvent) => {
+      const messageSubscription = LHMessagePeerConnection.addMessageReceivedListener(({ peerId, message, type }: MessageEvent) => {
         console.log('Message received from:', peerId);
         const newMessage: IMessage = {
           _id: `${Date.now()}-${peerId}`,
-          text: message,
+          text: type === 'text' ? message : '📷 Image',
           createdAt: new Date(),
           user: {
             _id: peerId,
             name: peerId,
           },
+          ...(type === 'image' && { image: message }),
         };
         setMessages(prev => GiftedChat.append(prev, [newMessage]));
       });
@@ -77,6 +83,45 @@ export const Chat = ({ route, navigation }: ChatScreenProps) => {
     };
   }, [setupPeerConnection]);
 
+  const handleImagePick = useCallback(async () => {
+    try {
+      const result = await launchImageLibrary({
+        mediaType: 'photo',
+        includeBase64: true,
+        maxWidth: 800,
+        maxHeight: 800,
+        quality: 0.7,
+      });
+
+      if (result.assets && result.assets[0]?.base64) {
+        setIsLoading(true);
+        try {
+          await LHMessagePeerConnection.sendImage(result.assets[0].base64);
+
+          const newMessage: IMessage = {
+            _id: `${Date.now()}-${deviceId}`,
+            text: '📷 Image',
+            createdAt: new Date(),
+            user: {
+              _id: deviceId,
+              name: username,
+            },
+            image: `data:image/jpeg;base64,${result.assets[0].base64}`,
+          };
+          setMessages(previousMessages => GiftedChat.append(previousMessages, [newMessage]));
+        } catch (error) {
+          console.error('Error sending image:', error);
+          Alert.alert('Error', 'Failed to send image');
+        } finally {
+          setIsLoading(false);
+        }
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Alert.alert('Error', 'Failed to pick image');
+    }
+  }, [deviceId, username]);
+
   const onSend = useCallback((newMessages: IMessage[] = []) => {
     try {
       const message = newMessages[0];
@@ -100,6 +145,32 @@ export const Chat = ({ route, navigation }: ChatScreenProps) => {
     }
   }, [deviceId, username]);
 
+  const renderActions = useCallback((props: ActionsProps) => {
+    return (
+      <Actions
+        {...props}
+        containerStyle={styles.actionsContainer}
+        icon={() => cameraButton()}
+        onPressActionButton={handleImagePick}
+        options={{
+          'Choose Image': handleImagePick,
+        }}
+      />
+    );
+  }, [cameraButton, handleImagePick]);
+
+  const renderSend = useCallback((props: SendProps<IMessage>) => {
+    return (
+      <Send
+        {...props}
+        disabled={isLoading}
+        containerStyle={styles.sendContainer}
+      >
+        <Icon name="paper-plane" size={20} color="#007AFF" disabled={isLoading} />
+      </Send>
+    );
+  }, [isLoading]);
+
   return (
     <View style={[styles.container, { paddingBottom: insets.bottom }]}>
       <View style={styles.header}>
@@ -117,6 +188,15 @@ export const Chat = ({ route, navigation }: ChatScreenProps) => {
           }}
           alwaysShowSend
           scrollToBottom
+          renderActions={renderActions}
+          renderSend={renderSend}
+          renderMessageImage={(props: MessageImageProps<IMessage>) => (
+            <Image
+              {...props}
+              style={styles.messageImage}
+              resizeMode="cover"
+            />
+          )}
         />
       </View>
     </View>
@@ -141,5 +221,25 @@ const styles = StyleSheet.create({
   },
   chatContainer: {
     flex: 1,
+  },
+  actionsContainer: {
+    width: 30,
+    height: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    margin: 0,
+  },
+  sendContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    alignSelf: 'center',
+    marginRight: 15,
+    marginBottom: 5,
+  },
+  messageImage: {
+    width: 200,
+    height: 200,
+    borderRadius: 8,
+    margin: 3,
   },
 });

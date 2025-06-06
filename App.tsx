@@ -2,7 +2,7 @@ import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Login } from './src/components/Login';
-import { ChatScreen } from './src/screens/ChatScreen';
+import { Chat } from './src/components/Chat';
 import { RootStackParamList } from './src/types/navigation';
 import { View, Text, StyleSheet } from 'react-native';
 
@@ -56,7 +56,7 @@ export default function App() {
             />
             <Stack.Screen
               name="Chat"
-              component={ChatScreen}
+              component={Chat}
             />
           </Stack.Navigator>
         </NavigationContainer>

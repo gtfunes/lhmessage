@@ -1,13 +1,20 @@
-export type MessageType = 'text' | 'image';
-
-export interface Message {
-  type: MessageType;
+export type Message = {
+  type: 'text' | 'image';
   content: string;
   timestamp: number;
   peerId: string;
-}
+};
 
-export interface ConnectionState {
+export type ConnectionState = {
+  state: 'connected' | 'notConnected' | 'connecting';
   peerId: string;
-  state: 'connected' | 'connecting' | 'disconnected';
-}
+};
+
+export type PeerEvent = {
+  peerId: string;
+};
+
+export type ConnectionStateEvent = {
+  peerId: string;
+  state: ConnectionState;
+};
