@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, StyleSheet, Alert, Text, SafeAreaView } from 'react-native';
+import { View, StyleSheet, Alert, Text } from 'react-native';
 import { GiftedChat, IMessage } from 'react-native-gifted-chat';
 import { ChatScreenProps } from '../types/navigation';
 import LHMessagePeerConnection, { ConnectionState, MessageEvent } from '../native/LHMessagePeerConnection';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export const Chat = ({ route, navigation }: ChatScreenProps) => {
+  const insets = useSafeAreaInsets();
   const { username, deviceId, roomName } = route.params;
   const [messages, setMessages] = useState<IMessage[]>([]);
   const [connectedPeers, setConnectedPeers] = useState<string[]>([]);
@@ -99,7 +101,7 @@ export const Chat = ({ route, navigation }: ChatScreenProps) => {
   }, [deviceId, username]);
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={[styles.container, { paddingBottom: insets.bottom }]}>
       <View style={styles.header}>
         <Text style={styles.peerCount}>
           Connected Peers: {connectedPeers.length}
@@ -117,7 +119,7 @@ export const Chat = ({ route, navigation }: ChatScreenProps) => {
           scrollToBottom
         />
       </View>
-    </SafeAreaView>
+    </View>
   );
 };
 
