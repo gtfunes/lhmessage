@@ -125,3 +125,5 @@ dependencies {
     // debugImplementation("com.facebook.flipper:flipper-fresco-plugin:${FLIPPER_VERSION}")
     // debugImplementation("com.facebook.react:flipper-integration")
 }
+
+apply from: file("../../node_modules/react-native-vector-icons/fonts.gradle")
