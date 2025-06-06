@@ -15,8 +15,13 @@ import { View, Text } from 'react-native';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error: Error | null;
+}
+
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }> {
-  state = { hasError: false, error: null };
+  state: ErrorBoundaryState = { hasError: false, error: null };
 
   static getDerivedStateFromError(error: Error) {
     return { hasError: true, error };
@@ -41,15 +46,10 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }> {
 }
 
 export default function App() {
-  console.log('App: Starting initialization');
-
   try {
     return (
       <ErrorBoundary>
-        <NavigationContainer
-          onStateChange={(state) => console.log('Navigation state changed:', state)}
-          onReady={() => console.log('Navigation container is ready')}
-        >
+        <NavigationContainer>
           <Stack.Navigator
             initialRouteName="Login"
             screenOptions={{
@@ -60,16 +60,10 @@ export default function App() {
             <Stack.Screen
               name="Login"
               component={Login}
-              listeners={{
-                focus: () => console.log('Login screen focused'),
-              }}
             />
             <Stack.Screen
               name="Chat"
               component={Chat}
-              listeners={{
-                focus: () => console.log('Chat screen focused'),
-              }}
             />
           </Stack.Navigator>
         </NavigationContainer>

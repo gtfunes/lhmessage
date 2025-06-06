@@ -21,7 +21,6 @@ export const Chat = ({ route, navigation }: ChatScreenProps) => {
 
   const setupPeerConnection = useCallback(() => {
     try {
-      console.log('Setting up peer connection for room:', roomName);
       LHMessagePeerConnection.startAdvertising(roomName);
       LHMessagePeerConnection.startBrowsing(roomName);
 
@@ -35,7 +34,7 @@ export const Chat = ({ route, navigation }: ChatScreenProps) => {
       });
 
       const messageSubscription = LHMessagePeerConnection.addMessageReceivedListener(({ peerId, message }: MessageEvent) => {
-        console.log('Message received from:', peerId, message);
+        console.log('Message received from:', peerId);
         const newMessage: IMessage = {
           _id: `${Date.now()}-${peerId}`,
           text: message,
@@ -70,10 +69,8 @@ export const Chat = ({ route, navigation }: ChatScreenProps) => {
   }, [roomName]);
 
   useEffect(() => {
-    console.log('Chat: Component mounted');
     const cleanup = setupPeerConnection();
     return () => {
-      console.log('Chat: Component unmounted');
       cleanup?.();
     };
   }, [setupPeerConnection]);

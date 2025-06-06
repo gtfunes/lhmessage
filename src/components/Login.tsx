@@ -19,8 +19,6 @@ interface UserData {
 }
 
 export const Login = ({ navigation }: LoginScreenProps) => {
-  console.log('Login: Component rendering');
-
   const [username, setUsername] = useState('');
   const [roomName, setRoomName] = useState('');
 
@@ -42,10 +40,7 @@ export const Login = ({ navigation }: LoginScreenProps) => {
   };
 
   const handleLogin = async () => {
-    console.log('Login: Attempting login with:', { username, roomName });
-
     if (!username.trim() || !roomName.trim()) {
-      console.log('Login: Validation failed - empty fields');
       return;
     }
 
@@ -59,10 +54,9 @@ export const Login = ({ navigation }: LoginScreenProps) => {
       // Save to AsyncStorage
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(userData));
 
-      console.log('Login: Navigating to Chat screen');
-      navigation.replace('Chat', userData);
-    } catch (error) {
-      console.error('Login: Navigation error:', error);
+      navigation.navigate('Chat', userData);
+    } catch (_error) {
+
     }
   };
 
