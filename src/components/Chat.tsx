@@ -24,7 +24,15 @@ export const Chat = ({ route, navigation }: ChatScreenProps) => {
     });
   }, [navigation, roomName]);
 
-  const cameraButton = useCallback(() => <Icon name="camera" size={20} disabled={connectedPeers.length === 0} color={connectedPeers.length ? '#007AFF' : '#999'} />, [connectedPeers]);
+  const cameraButton = useCallback(() => (
+    <Icon
+      name="camera"
+      size={20}
+      disabled={connectedPeers.length === 0}
+      color={connectedPeers.length ? '#007AFF' : '#999'}
+      testID="camera-button"
+    />
+  ), [connectedPeers]);
 
   const setupPeerConnection = useCallback(() => {
     try {
@@ -206,6 +214,7 @@ export const Chat = ({ route, navigation }: ChatScreenProps) => {
           size={20}
           color={connectedPeers.length === 0 ? '#999' : '#007AFF'}
           disabled={isLoading || connectedPeers.length === 0}
+          testID="send-button"
         />
       </Send>
     );
@@ -237,6 +246,7 @@ export const Chat = ({ route, navigation }: ChatScreenProps) => {
               resizeMode="cover"
             />
           )}
+          testID="gifted-chat"
         />
       </View>
     </View>
