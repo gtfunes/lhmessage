@@ -1,6 +1,15 @@
 #import "LHMessagePeerConnection.h"
 #import <React/RCTLog.h>
 #import <MultipeerConnectivity/MultipeerConnectivity.h>
+#import <UIKit/UIKit.h>
+
+// Message type constants
+static NSString *const kMessageTypeText = @"text";
+static NSString *const kMessageTypeImage = @"image";
+
+// Image constants
+static const CGFloat kMaxImageSize = 5.0 * 1024 * 1024; // 5MB
+static const CGFloat kImageCompressionQuality = 0.7; // 70% quality
 
 @interface LHMessagePeerConnection () <MCSessionDelegate, MCNearbyServiceAdvertiserDelegate, MCNearbyServiceBrowserDelegate>
 
@@ -136,29 +145,111 @@ RCT_EXPORT_METHOD(startBrowsing:(NSString *)roomName
   });
 }
 
+RCT_EXPORT_METHOD(sendImage:(NSString *)base64Image
+                  resolver:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        @try {
+            if (!self.session || self.connectedPeers.count == 0) {
+                reject(@"error", @"Session not initialized or no connected peers", nil);
+                return;
+            }
+
+            // Decode base64 image
+            NSData *imageData = [[NSData alloc] initWithBase64EncodedString:base64Image options:NSDataBase64DecodingIgnoreUnknownCharacters];
+            if (!imageData) {
+                reject(@"error", @"Invalid base64 image data", nil);
+                return;
+            }
+
+            // Convert to UIImage
+            UIImage *image = [UIImage imageWithData:imageData];
+            if (!image) {
+                reject(@"error", @"Could not create image from data", nil);
+                return;
+            }
+
+            // Compress image
+            NSData *compressedData = UIImageJPEGRepresentation(image, kImageCompressionQuality);
+            if (!compressedData) {
+                reject(@"error", @"Failed to compress image", nil);
+                return;
+            }
+
+            // Check size
+            if (compressedData.length > kMaxImageSize) {
+                reject(@"error", @"Image size exceeds 5MB limit after compression", nil);
+                return;
+            }
+
+            // Create message dictionary
+            NSDictionary *messageDict = @{
+                @"type": kMessageTypeImage,
+                @"content": [compressedData base64EncodedStringWithOptions:0],
+                @"timestamp": @([[NSDate date] timeIntervalSince1970] * 1000)
+            };
+
+            // Convert to JSON
+            NSError *jsonError;
+            NSData *messageData = [NSJSONSerialization dataWithJSONObject:messageDict options:0 error:&jsonError];
+            if (jsonError) {
+                reject(@"error", @"Failed to create message JSON", jsonError);
+                return;
+            }
+
+            // Send data
+            NSError *sendError;
+            [self.session sendData:messageData toPeers:self.connectedPeers withMode:MCSessionSendDataReliable error:&sendError];
+
+            if (sendError) {
+                reject(@"error", sendError.localizedDescription, sendError);
+            } else {
+                resolve(@YES);
+            }
+        } @catch (NSException *exception) {
+            reject(@"error", exception.reason, nil);
+        }
+    });
+}
+
 RCT_EXPORT_METHOD(sendMessage:(NSString *)message
                   resolver:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject) {
-  dispatch_async(dispatch_get_main_queue(), ^{
-    @try {
-      if (!self.session || self.connectedPeers.count == 0) {
-        reject(@"error", @"Session not initialized or no connected peers", nil);
-        return;
-      }
+    dispatch_async(dispatch_get_main_queue(), ^{
+        @try {
+            if (!self.session || self.connectedPeers.count == 0) {
+                reject(@"error", @"Session not initialized or no connected peers", nil);
+                return;
+            }
 
-      NSData *messageData = [message dataUsingEncoding:NSUTF8StringEncoding];
-      NSError *error;
-      [self.session sendData:messageData toPeers:self.connectedPeers withMode:MCSessionSendDataReliable error:&error];
+            // Create message dictionary
+            NSDictionary *messageDict = @{
+                @"type": kMessageTypeText,
+                @"content": message,
+                @"timestamp": @([[NSDate date] timeIntervalSince1970] * 1000)
+            };
 
-      if (error) {
-        reject(@"error", error.localizedDescription, error);
-      } else {
-        resolve(@YES);
-      }
-    } @catch (NSException *exception) {
-      reject(@"error", exception.reason, nil);
-    }
-  });
+            // Convert to JSON
+            NSError *jsonError;
+            NSData *messageData = [NSJSONSerialization dataWithJSONObject:messageDict options:0 error:&jsonError];
+            if (jsonError) {
+                reject(@"error", @"Failed to create message JSON", jsonError);
+                return;
+            }
+
+            // Send data
+            NSError *sendError;
+            [self.session sendData:messageData toPeers:self.connectedPeers withMode:MCSessionSendDataReliable error:&sendError];
+
+            if (sendError) {
+                reject(@"error", sendError.localizedDescription, sendError);
+            } else {
+                resolve(@YES);
+            }
+        } @catch (NSException *exception) {
+            reject(@"error", exception.reason, nil);
+        }
+    });
 }
 
 RCT_EXPORT_METHOD(addPeerFoundListener:(RCTResponseSenderBlock)callback) {
@@ -197,12 +288,27 @@ RCT_EXPORT_METHOD(addConnectionStateChangedListener:(RCTResponseSenderBlock)call
 }
 
 - (void)session:(MCSession *)session didReceiveData:(NSData *)data fromPeer:(MCPeerID *)peerID {
-  dispatch_async(dispatch_get_main_queue(), ^{
-    NSString *message = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
-    if (message) {
-      [self notifyMessageReceived:peerID message:message];
-    }
-  });
+    dispatch_async(dispatch_get_main_queue(), ^{
+        @try {
+            // Parse message JSON
+            NSError *jsonError;
+            NSDictionary *messageDict = [NSJSONSerialization JSONObjectWithData:data options:0 error:&jsonError];
+            if (jsonError) {
+                RCTLogError(@"Failed to parse message JSON: %@", jsonError);
+                return;
+            }
+
+            // Create event dictionary
+            NSMutableDictionary *eventDict = [NSMutableDictionary dictionary];
+            [eventDict addEntriesFromDictionary:messageDict];
+            [eventDict setObject:peerID.displayName forKey:@"peerId"];
+
+            // Send event
+            [self sendEventWithName:@"messageReceived" body:eventDict];
+        } @catch (NSException *exception) {
+            RCTLogError(@"Error processing received message: %@", exception);
+        }
+    });
 }
 
 - (void)session:(MCSession *)session didReceiveStream:(NSInputStream *)stream withName:(NSString *)streamName fromPeer:(MCPeerID *)peerID {
