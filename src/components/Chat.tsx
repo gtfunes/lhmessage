@@ -24,7 +24,7 @@ export const Chat = ({ route, navigation }: ChatScreenProps) => {
     });
   }, [navigation, roomName]);
 
-  const cameraButton = useCallback(() => <Icon name="camera" size={20} color="#007AFF" />, []);
+  const cameraButton = useCallback(() => <Icon name="camera" size={20} disabled={connectedPeers.length === 0} color={connectedPeers.length ? '#007AFF' : '#999'} />, [connectedPeers]);
 
   const setupPeerConnection = useCallback(() => {
     try {
@@ -84,6 +84,10 @@ export const Chat = ({ route, navigation }: ChatScreenProps) => {
   }, [setupPeerConnection]);
 
   const handleImagePick = useCallback(async () => {
+    if (connectedPeers.length === 0) {
+      return;
+    }
+
     try {
       const result = await launchImageLibrary({
         mediaType: 'photo',
@@ -93,36 +97,60 @@ export const Chat = ({ route, navigation }: ChatScreenProps) => {
         quality: 0.7,
       });
 
-      if (result.assets && result.assets[0]?.base64) {
-        setIsLoading(true);
-        try {
-          await LHMessagePeerConnection.sendImage(result.assets[0].base64);
+      if (!result.assets || !result.assets[0]) {
+        console.log('No image selected');
+        return;
+      }
 
-          const newMessage: IMessage = {
-            _id: `${Date.now()}-${deviceId}`,
-            text: '📷 Image',
-            createdAt: new Date(),
-            user: {
-              _id: deviceId,
-              name: username,
-            },
-            image: `data:image/jpeg;base64,${result.assets[0].base64}`,
-          };
-          setMessages(previousMessages => GiftedChat.append(previousMessages, [newMessage]));
-        } catch (error) {
-          console.error('Error sending image:', error);
+      const imageAsset = result.assets[0];
+      if (!imageAsset.base64) {
+        console.error('No base64 data in image asset');
+        Alert.alert('Error', 'Failed to process image');
+        return;
+      }
+
+      setIsLoading(true);
+      try {
+        console.log('Sending image...');
+        await LHMessagePeerConnection.sendImage(imageAsset.base64);
+        console.log('Image sent successfully');
+
+        const newMessage: IMessage = {
+          _id: `${Date.now()}-${deviceId}`,
+          text: '📷 Image',
+          createdAt: new Date(),
+          user: {
+            _id: deviceId,
+            name: username,
+          },
+          image: `data:image/jpeg;base64,${imageAsset.base64}`,
+        };
+        setMessages(previousMessages => GiftedChat.append(previousMessages, [newMessage]));
+      } catch (error) {
+        console.error('Error sending image:', error);
+        if (error instanceof Error) {
+          Alert.alert('Error', `Failed to send image: ${error.message}`);
+        } else {
           Alert.alert('Error', 'Failed to send image');
-        } finally {
-          setIsLoading(false);
         }
+      } finally {
+        setIsLoading(false);
       }
     } catch (error) {
       console.error('Error picking image:', error);
-      Alert.alert('Error', 'Failed to pick image');
+      if (error instanceof Error) {
+        Alert.alert('Error', `Failed to pick image: ${error.message}`);
+      } else {
+        Alert.alert('Error', 'Failed to pick image');
+      }
     }
-  }, [deviceId, username]);
+  }, [deviceId, username, connectedPeers]);
 
   const onSend = useCallback((newMessages: IMessage[] = []) => {
+    if (connectedPeers.length === 0) {
+      return;
+    }
+
     try {
       const message = newMessages[0];
       if (!message) {return;}
@@ -143,33 +171,45 @@ export const Chat = ({ route, navigation }: ChatScreenProps) => {
       console.error('Error sending message:', error);
       Alert.alert('Error', 'Failed to send message');
     }
-  }, [deviceId, username]);
+  }, [deviceId, username, connectedPeers]);
 
   const renderActions = useCallback((props: ActionsProps) => {
+    const handlePress = () => {
+      if (connectedPeers.length === 0) {
+        return;
+      }
+      handleImagePick();
+    };
+
     return (
       <Actions
         {...props}
         containerStyle={styles.actionsContainer}
         icon={() => cameraButton()}
-        onPressActionButton={handleImagePick}
+        onPressActionButton={handlePress}
         options={{
-          'Choose Image': handleImagePick,
+          'Choose Image': handlePress,
         }}
       />
     );
-  }, [cameraButton, handleImagePick]);
+  }, [cameraButton, handleImagePick, connectedPeers]);
 
   const renderSend = useCallback((props: SendProps<IMessage>) => {
     return (
       <Send
         {...props}
-        disabled={isLoading}
+        disabled={isLoading || connectedPeers.length === 0}
         containerStyle={styles.sendContainer}
       >
-        <Icon name="paper-plane" size={20} color="#007AFF" disabled={isLoading} />
+        <Icon
+          name="paper-plane"
+          size={20}
+          color={connectedPeers.length === 0 ? '#999' : '#007AFF'}
+          disabled={isLoading || connectedPeers.length === 0}
+        />
       </Send>
     );
-  }, [isLoading]);
+  }, [isLoading, connectedPeers]);
 
   return (
     <View style={[styles.container, { paddingBottom: insets.bottom }]}>
