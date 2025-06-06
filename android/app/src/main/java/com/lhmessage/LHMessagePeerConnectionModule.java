@@ -24,11 +24,15 @@ import com.google.android.gms.nearby.connection.PayloadCallback;
 import com.google.android.gms.nearby.connection.PayloadTransferUpdate;
 import com.google.android.gms.nearby.connection.Strategy;
 
+import java.util.HashSet;
+import java.util.Set;
+
 public class LHMessagePeerConnectionModule extends ReactContextBaseJavaModule {
     private static final String TAG = "LHMessagePeerConnection";
     private final ReactApplicationContext reactContext;
     private final ConnectionsClient connectionsClient;
     private String localEndpointName;
+    private final Set<String> connectedEndpoints = new HashSet<>();
 
     public LHMessagePeerConnectionModule(ReactApplicationContext reactContext) {
         super(reactContext);
@@ -78,7 +82,9 @@ public class LHMessagePeerConnectionModule extends ReactContextBaseJavaModule {
     @ReactMethod
     public void sendMessage(String message) {
         Payload payload = Payload.fromBytes(message.getBytes());
-        connectionsClient.sendPayload(connectionsClient.getConnectedEndpoints(), payload);
+        for (String endpointId : connectedEndpoints) {
+            connectionsClient.sendPayload(endpointId, payload);
+        }
     }
 
     private final ConnectionLifecycleCallback connectionLifecycleCallback = new ConnectionLifecycleCallback() {
@@ -94,12 +100,15 @@ public class LHMessagePeerConnectionModule extends ReactContextBaseJavaModule {
             
             switch (resolution.getStatus().getStatusCode()) {
                 case ConnectionsStatusCodes.STATUS_OK:
+                    connectedEndpoints.add(endpointId);
                     params.putInt("state", 2); // Connected
                     break;
                 case ConnectionsStatusCodes.STATUS_CONNECTION_REJECTED:
+                    connectedEndpoints.remove(endpointId);
                     params.putInt("state", 0); // Not Connected
                     break;
                 case ConnectionsStatusCodes.STATUS_ERROR:
+                    connectedEndpoints.remove(endpointId);
                     params.putInt("state", 0); // Not Connected
                     break;
                 default:
@@ -111,6 +120,7 @@ public class LHMessagePeerConnectionModule extends ReactContextBaseJavaModule {
 
         @Override
         public void onDisconnected(String endpointId) {
+            connectedEndpoints.remove(endpointId);
             WritableMap params = Arguments.createMap();
             params.putString("peerId", endpointId);
             params.putInt("state", 0); // Not Connected
