@@ -246,7 +246,7 @@ export const Chat = ({ route, navigation }: ChatScreenProps) => {
               resizeMode="cover"
             />
           )}
-          // @ts-ignore
+          // @ts-expect-error Need to fix this
           testID="gifted-chat"
         />
       </View>

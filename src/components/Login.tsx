@@ -55,9 +55,7 @@ export const Login = ({ navigation }: LoginScreenProps) => {
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(userData));
 
       navigation.navigate('Chat', userData);
-    } catch (_error) {
-
-    }
+    } catch (_error) { /* empty */ }
   };
 
   return (
