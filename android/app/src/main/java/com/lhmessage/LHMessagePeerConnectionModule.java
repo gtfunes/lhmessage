@@ -1,6 +1,9 @@
 package com.lhmessage;
 
 import android.content.Context;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.util.Base64;
 import android.util.Log;
 
 import com.facebook.react.bridge.Arguments;
@@ -24,6 +27,10 @@ import com.google.android.gms.nearby.connection.PayloadCallback;
 import com.google.android.gms.nearby.connection.PayloadTransferUpdate;
 import com.google.android.gms.nearby.connection.Strategy;
 
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import java.io.ByteArrayOutputStream;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -33,6 +40,14 @@ public class LHMessagePeerConnectionModule extends ReactContextBaseJavaModule {
     private final ConnectionsClient connectionsClient;
     private String localEndpointName;
     private final Set<String> connectedEndpoints = new HashSet<>();
+
+    // Message type constants
+    private static final String MESSAGE_TYPE_TEXT = "text";
+    private static final String MESSAGE_TYPE_IMAGE = "image";
+
+    // Image constants
+    private static final int MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
+    private static final int IMAGE_COMPRESSION_QUALITY = 70; // 70% quality
 
     public LHMessagePeerConnectionModule(ReactApplicationContext reactContext) {
         super(reactContext);
@@ -81,9 +96,57 @@ public class LHMessagePeerConnectionModule extends ReactContextBaseJavaModule {
 
     @ReactMethod
     public void sendMessage(String message) {
-        Payload payload = Payload.fromBytes(message.getBytes());
-        for (String endpointId : connectedEndpoints) {
-            connectionsClient.sendPayload(endpointId, payload);
+        try {
+            JSONObject messageJson = new JSONObject();
+            messageJson.put("type", MESSAGE_TYPE_TEXT);
+            messageJson.put("content", message);
+            messageJson.put("timestamp", System.currentTimeMillis());
+
+            Payload payload = Payload.fromBytes(messageJson.toString().getBytes());
+            for (String endpointId : connectedEndpoints) {
+                connectionsClient.sendPayload(endpointId, payload);
+            }
+        } catch (JSONException e) {
+            Log.e(TAG, "Error creating message JSON", e);
+        }
+    }
+
+    @ReactMethod
+    public void sendImage(String base64Image) {
+        try {
+            // Decode base64 image
+            byte[] imageBytes = Base64.decode(base64Image, Base64.DEFAULT);
+            Bitmap bitmap = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.length);
+            
+            if (bitmap == null) {
+                Log.e(TAG, "Failed to decode image");
+                return;
+            }
+
+            // Compress image
+            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+            bitmap.compress(Bitmap.CompressFormat.JPEG, IMAGE_COMPRESSION_QUALITY, outputStream);
+            byte[] compressedImage = outputStream.toByteArray();
+
+            // Check size
+            if (compressedImage.length > MAX_IMAGE_SIZE) {
+                Log.e(TAG, "Image size exceeds 5MB limit after compression");
+                return;
+            }
+
+            // Create message JSON
+            JSONObject messageJson = new JSONObject();
+            messageJson.put("type", MESSAGE_TYPE_IMAGE);
+            messageJson.put("content", Base64.encodeToString(compressedImage, Base64.DEFAULT));
+            messageJson.put("timestamp", System.currentTimeMillis());
+
+            // Send payload
+            Payload payload = Payload.fromBytes(messageJson.toString().getBytes());
+            for (String endpointId : connectedEndpoints) {
+                connectionsClient.sendPayload(endpointId, payload);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error processing image", e);
         }
     }
 
@@ -154,11 +217,18 @@ public class LHMessagePeerConnectionModule extends ReactContextBaseJavaModule {
         @Override
         public void onPayloadReceived(String endpointId, Payload payload) {
             if (payload.getType() == Payload.Type.BYTES) {
-                String message = new String(payload.asBytes());
-                WritableMap params = Arguments.createMap();
-                params.putString("peerId", endpointId);
-                params.putString("message", message);
-                sendEvent("messageReceived", params);
+                String messageJson = new String(payload.asBytes());
+                try {
+                    JSONObject json = new JSONObject(messageJson);
+                    WritableMap params = Arguments.createMap();
+                    params.putString("peerId", endpointId);
+                    params.putString("type", json.getString("type"));
+                    params.putString("content", json.getString("content"));
+                    params.putDouble("timestamp", json.getDouble("timestamp"));
+                    sendEvent("messageReceived", params);
+                } catch (JSONException e) {
+                    Log.e(TAG, "Error parsing message JSON", e);
+                }
             }
         }
 
