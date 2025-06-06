@@ -246,6 +246,7 @@ export const Chat = ({ route, navigation }: ChatScreenProps) => {
               resizeMode="cover"
             />
           )}
+          // @ts-ignore
           testID="gifted-chat"
         />
       </View>
