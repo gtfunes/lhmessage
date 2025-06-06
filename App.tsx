@@ -11,7 +11,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Login } from './src/components/Login';
 import { Chat } from './src/components/Chat';
 import { RootStackParamList } from './src/types/navigation';
-import { View, Text } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -34,9 +34,9 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }> {
   render() {
     if (this.state.hasError) {
       return (
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <View style={styles.errorContainer}>
           <Text>Something went wrong. Please restart the app.</Text>
-          <Text style={{ marginTop: 10, color: 'red' }}>{this.state.error?.toString()}</Text>
+          <Text style={styles.errorText}>{this.state.error?.toString()}</Text>
         </View>
       );
     }
@@ -72,10 +72,22 @@ export default function App() {
   } catch (error) {
     console.error('App: Error during initialization:', error);
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+      <View style={styles.errorContainer}>
         <Text>Failed to initialize app. Please restart.</Text>
-        <Text style={{ marginTop: 10, color: 'red' }}>{error?.toString()}</Text>
+        <Text style={styles.errorText}>{error?.toString()}</Text>
       </View>
     );
   }
 }
+
+const styles = StyleSheet.create({
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorText: {
+    marginTop: 10,
+    color: 'red',
+  },
+});
