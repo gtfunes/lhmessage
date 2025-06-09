@@ -14,6 +14,7 @@ typedef NS_ENUM(NSInteger, ConnectionState) {
 - (void)startBrowsing:(NSString *)roomName resolver:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject;
 - (void)sendMessage:(NSString *)message resolver:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject;
 - (void)sendImage:(NSString *)base64Image resolver:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject;
+- (void)removeListeners:(double)count;
 
 // Internal notification methods
 - (void)notifyPeerFound:(MCPeerID *)peerID;

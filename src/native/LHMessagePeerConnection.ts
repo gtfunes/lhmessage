@@ -43,6 +43,9 @@ export default {
     sendImage: (base64Image: string): Promise<void> => {
         return LHMessagePeerConnection.sendImage(base64Image);
     },
+    removeListeners: (count: number): void => {
+        LHMessagePeerConnection.removeListeners(count);
+    },
     addPeerFoundListener: (callback: (event: PeerEvent) => void) => {
         return eventEmitter.addListener('peerFound', callback);
     },

@@ -77,6 +77,7 @@ export const Chat = ({ route, navigation }: ChatScreenProps) => {
         peerLostSubscription.remove();
         messageSubscription.remove();
         connectionSubscription.remove();
+        LHMessagePeerConnection.removeListeners();
       };
     } catch (error) {
       console.error('Error setting up peer connection:', error);

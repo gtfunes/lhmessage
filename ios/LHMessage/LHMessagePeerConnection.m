@@ -274,6 +274,13 @@ RCT_EXPORT_METHOD(addConnectionStateChangedListener:(RCTResponseSenderBlock)call
   [self.connectionStateCallbacks addObject:callback];
 }
 
+RCT_EXPORT_METHOD(removeListeners:(double)count) {
+    // This method is required by RCTEventEmitter
+    // It's called when the last listener is removed
+    RCTLogInfo(@"LHMessagePeerConnection: Removing %f listeners", count);
+    [self cleanup];
+}
+
 #pragma mark - MCSessionDelegate
 
 - (void)session:(MCSession *)session peer:(MCPeerID *)peerID didChangeState:(MCSessionState)state {

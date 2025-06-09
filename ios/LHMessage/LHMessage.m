@@ -19,4 +19,6 @@ RCT_EXTERN_METHOD(sendImage:(NSString *)base64Image
                   resolver:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)
 
+RCT_EXTERN_METHOD(removeListeners:(double)count)
+
 @end 

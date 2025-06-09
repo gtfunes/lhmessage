@@ -7,6 +7,7 @@ import android.util.Base64;
 import android.util.Log;
 
 import com.facebook.react.bridge.Arguments;
+import com.facebook.react.bridge.Promise;
 import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.ReactContextBaseJavaModule;
 import com.facebook.react.bridge.ReactMethod;
@@ -68,34 +69,44 @@ public class LHMessagePeerConnectionModule extends ReactContextBaseJavaModule {
     }
 
     @ReactMethod
-    public void startAdvertising(String serviceType) {
-        AdvertisingOptions advertisingOptions = new AdvertisingOptions.Builder()
-            .setStrategy(Strategy.P2P_STAR)
-            .build();
+    public void startAdvertising(String roomName, Promise promise) {
+        try {
+            AdvertisingOptions advertisingOptions = new AdvertisingOptions.Builder()
+                .setStrategy(Strategy.P2P_STAR)
+                .build();
 
-        connectionsClient.startAdvertising(
-            localEndpointName,
-            serviceType,
-            connectionLifecycleCallback,
-            advertisingOptions
-        );
+            connectionsClient.startAdvertising(
+                localEndpointName,
+                roomName,
+                connectionLifecycleCallback,
+                advertisingOptions
+            );
+            promise.resolve(true);
+        } catch (Exception e) {
+            promise.reject("error", e.getMessage());
+        }
     }
 
     @ReactMethod
-    public void startBrowsing(String serviceType) {
-        DiscoveryOptions discoveryOptions = new DiscoveryOptions.Builder()
-            .setStrategy(Strategy.P2P_STAR)
-            .build();
+    public void startBrowsing(String roomName, Promise promise) {
+        try {
+            DiscoveryOptions discoveryOptions = new DiscoveryOptions.Builder()
+                .setStrategy(Strategy.P2P_STAR)
+                .build();
 
-        connectionsClient.startDiscovery(
-            serviceType,
-            endpointDiscoveryCallback,
-            discoveryOptions
-        );
+            connectionsClient.startDiscovery(
+                roomName,
+                endpointDiscoveryCallback,
+                discoveryOptions
+            );
+            promise.resolve(true);
+        } catch (Exception e) {
+            promise.reject("error", e.getMessage());
+        }
     }
 
     @ReactMethod
-    public void sendMessage(String message) {
+    public void sendMessage(String message, Promise promise) {
         try {
             JSONObject messageJson = new JSONObject();
             messageJson.put("type", MESSAGE_TYPE_TEXT);
@@ -106,20 +117,21 @@ public class LHMessagePeerConnectionModule extends ReactContextBaseJavaModule {
             for (String endpointId : connectedEndpoints) {
                 connectionsClient.sendPayload(endpointId, payload);
             }
-        } catch (JSONException e) {
-            Log.e(TAG, "Error creating message JSON", e);
+            promise.resolve(null);
+        } catch (Exception e) {
+            promise.reject("error", e.getMessage());
         }
     }
 
     @ReactMethod
-    public void sendImage(String base64Image) {
+    public void sendImage(String base64Image, Promise promise) {
         try {
             // Decode base64 image
             byte[] imageBytes = Base64.decode(base64Image, Base64.DEFAULT);
             Bitmap bitmap = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.length);
             
             if (bitmap == null) {
-                Log.e(TAG, "Failed to decode image");
+                promise.reject("error", "Failed to decode image");
                 return;
             }
 
@@ -130,7 +142,7 @@ public class LHMessagePeerConnectionModule extends ReactContextBaseJavaModule {
 
             // Check size
             if (compressedImage.length > MAX_IMAGE_SIZE) {
-                Log.e(TAG, "Image size exceeds 5MB limit after compression");
+                promise.reject("error", "Image size exceeds 5MB limit after compression");
                 return;
             }
 
@@ -145,8 +157,20 @@ public class LHMessagePeerConnectionModule extends ReactContextBaseJavaModule {
             for (String endpointId : connectedEndpoints) {
                 connectionsClient.sendPayload(endpointId, payload);
             }
+            promise.resolve(null);
         } catch (Exception e) {
-            Log.e(TAG, "Error processing image", e);
+            promise.reject("error", e.getMessage());
+        }
+    }
+
+    @ReactMethod
+    public void removeListeners(int count) {
+        try {
+            connectionsClient.stopAdvertising();
+            connectionsClient.stopDiscovery();
+            connectedEndpoints.clear();
+        } catch (Exception e) {
+            Log.e(TAG, "Error removing listeners", e);
         }
     }
 
@@ -160,22 +184,23 @@ public class LHMessagePeerConnectionModule extends ReactContextBaseJavaModule {
         public void onConnectionResult(String endpointId, ConnectionResolution resolution) {
             WritableMap params = Arguments.createMap();
             params.putString("peerId", endpointId);
+            params.putString("displayName", endpointId);
             
             switch (resolution.getStatus().getStatusCode()) {
                 case ConnectionsStatusCodes.STATUS_OK:
                     connectedEndpoints.add(endpointId);
-                    params.putInt("state", 2); // Connected
+                    params.putString("state", "connected");
                     break;
                 case ConnectionsStatusCodes.STATUS_CONNECTION_REJECTED:
                     connectedEndpoints.remove(endpointId);
-                    params.putInt("state", 0); // Not Connected
+                    params.putString("state", "notConnected");
                     break;
                 case ConnectionsStatusCodes.STATUS_ERROR:
                     connectedEndpoints.remove(endpointId);
-                    params.putInt("state", 0); // Not Connected
+                    params.putString("state", "notConnected");
                     break;
                 default:
-                    params.putInt("state", 1); // Connecting
+                    params.putString("state", "connecting");
             }
             
             sendEvent("connectionStateChanged", params);
@@ -186,7 +211,8 @@ public class LHMessagePeerConnectionModule extends ReactContextBaseJavaModule {
             connectedEndpoints.remove(endpointId);
             WritableMap params = Arguments.createMap();
             params.putString("peerId", endpointId);
-            params.putInt("state", 0); // Not Connected
+            params.putString("displayName", endpointId);
+            params.putString("state", "notConnected");
             sendEvent("connectionStateChanged", params);
         }
     };
@@ -196,6 +222,7 @@ public class LHMessagePeerConnectionModule extends ReactContextBaseJavaModule {
         public void onEndpointFound(String endpointId, DiscoveredEndpointInfo discoveredEndpointInfo) {
             WritableMap params = Arguments.createMap();
             params.putString("peerId", endpointId);
+            params.putString("displayName", discoveredEndpointInfo.getEndpointName());
             sendEvent("peerFound", params);
             
             connectionsClient.requestConnection(
@@ -209,6 +236,7 @@ public class LHMessagePeerConnectionModule extends ReactContextBaseJavaModule {
         public void onEndpointLost(String endpointId) {
             WritableMap params = Arguments.createMap();
             params.putString("peerId", endpointId);
+            params.putString("displayName", endpointId);
             sendEvent("peerLost", params);
         }
     };
@@ -216,25 +244,25 @@ public class LHMessagePeerConnectionModule extends ReactContextBaseJavaModule {
     private final PayloadCallback payloadCallback = new PayloadCallback() {
         @Override
         public void onPayloadReceived(String endpointId, Payload payload) {
-            if (payload.getType() == Payload.Type.BYTES) {
-                String messageJson = new String(payload.asBytes());
-                try {
-                    JSONObject json = new JSONObject(messageJson);
-                    WritableMap params = Arguments.createMap();
-                    params.putString("peerId", endpointId);
-                    params.putString("type", json.getString("type"));
-                    params.putString("content", json.getString("content"));
-                    params.putDouble("timestamp", json.getDouble("timestamp"));
-                    sendEvent("messageReceived", params);
-                } catch (JSONException e) {
-                    Log.e(TAG, "Error parsing message JSON", e);
-                }
+            try {
+                String messageStr = new String(payload.asBytes());
+                JSONObject messageJson = new JSONObject(messageStr);
+                
+                WritableMap params = Arguments.createMap();
+                params.putString("peerId", endpointId);
+                params.putString("message", messageJson.getString("content"));
+                params.putString("type", messageJson.getString("type"));
+                params.putDouble("timestamp", messageJson.getDouble("timestamp"));
+                
+                sendEvent("messageReceived", params);
+            } catch (Exception e) {
+                Log.e(TAG, "Error processing received message", e);
             }
         }
 
         @Override
         public void onPayloadTransferUpdate(String endpointId, PayloadTransferUpdate update) {
-            // Handle transfer updates if needed
+            // Not implemented
         }
     };
 } 
