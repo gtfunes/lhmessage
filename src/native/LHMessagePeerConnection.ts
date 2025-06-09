@@ -15,6 +15,7 @@ export interface MessageEvent {
     peerId: string;
     message: string;
     type: 'text' | 'image';
+    timestamp?: number;
 }
 
 export interface ConnectionStateEvent {
@@ -24,15 +25,16 @@ export interface ConnectionStateEvent {
 
 export interface PeerEvent {
     peerId: string;
+    displayName: string;
 }
 
 const eventEmitter = new NativeEventEmitter(LHMessagePeerConnection);
 
 export default {
-    startAdvertising: (roomName: string): Promise<void> => {
+    startAdvertising: (roomName: string): Promise<boolean> => {
         return LHMessagePeerConnection.startAdvertising(roomName);
     },
-    startBrowsing: (roomName: string): Promise<void> => {
+    startBrowsing: (roomName: string): Promise<boolean> => {
         return LHMessagePeerConnection.startBrowsing(roomName);
     },
     sendMessage: (message: string): Promise<void> => {
