@@ -105,10 +105,13 @@ RCT_EXPORT_METHOD(startAdvertising:(NSString *)roomName
         self.session.delegate = self;
       }
       
-      if (!self.advertiser) {
-        self.advertiser = [[MCNearbyServiceAdvertiser alloc] initWithPeer:self.peerId discoveryInfo:nil serviceType:roomName];
-        self.advertiser.delegate = self;
+      if (self.advertiser) {
+        [self.advertiser stopAdvertisingPeer];
+        self.advertiser = nil;
       }
+
+      self.advertiser = [[MCNearbyServiceAdvertiser alloc] initWithPeer:self.peerId discoveryInfo:nil serviceType:roomName];
+      self.advertiser.delegate = self;
 
       [self.advertiser startAdvertisingPeer];
       resolve(@YES);
@@ -132,10 +135,13 @@ RCT_EXPORT_METHOD(startBrowsing:(NSString *)roomName
         self.session.delegate = self;
       }
       
-      if (!self.browser) {
-        self.browser = [[MCNearbyServiceBrowser alloc] initWithPeer:self.peerId serviceType:roomName];
-        self.browser.delegate = self;
+      if (self.browser) {
+        [self.browser stopBrowsingForPeers];
+        self.browser = nil;
       }
+
+      self.browser = [[MCNearbyServiceBrowser alloc] initWithPeer:self.peerId serviceType:roomName];
+      self.browser.delegate = self;
 
       [self.browser startBrowsingForPeers];
       resolve(@YES);
